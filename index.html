@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
-    
+        
     <!-- Polices & Icônes -->
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
@@ -30,6 +30,7 @@
                         dark: '#121212',
                         personal: '#a60df2',
                         professional: '#00f2ea',
+                        common: '#0070f3',
                         accent: '#ff8c00',
                     },
                     fontFamily: { sans: ['Manrope', 'sans-serif'] },
@@ -39,41 +40,37 @@
     </script>
 
     <style>
-        body { background-color: #121212; color: white; margin: 0; min-height: 100vh; overflow-x: hidden; }
+        body { background-color: #121212; color: white; margin: 0; min-height: 100vh; overflow-x: hidden; position: relative; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2.2rem; }
         
-        .glass {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 2.5rem;
-        }
-
         .neon-purple { filter: drop-shadow(0 0 5px #a60df2); color: #a60df2; }
         .neon-turquoise { filter: drop-shadow(0 0 5px #00f2ea); color: #00f2ea; }
+        .neon-blue { filter: drop-shadow(0 0 5px #0070f3); color: #0070f3; }
         .neon-orange { filter: drop-shadow(0 0 8px #ff8c00); color: #ff8c00; }
         
         .card-personal { border-bottom: 2px solid #a60df2; }
-        .card-pro { border-bottom: 2px solid rgba(0, 242, 234, 0.3); }
+        .card-pro { border-bottom: 2px solid #00f2ea; }
+        .card-common { border-bottom: 2px solid #0070f3; }
 
-        .btn-plus {
-            background: #ff8c00;
-            box-shadow: 0 0 40px rgba(255, 140, 0, 0.5);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
+        .btn-plus { background: #ff8c00; box-shadow: 0 0 40px rgba(255, 140, 0, 0.5); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        
+        @keyframes drift { 0% { transform: translate(0, 0) scale(1); opacity: 0.3; } 50% { transform: translate(60px, 30px) scale(1.1); opacity: 0.5; } 100% { transform: translate(-30px, 60px) scale(1); opacity: 0.3; } }
+        .neon-particle { position: fixed; border-radius: 50%; filter: blur(65px); z-index: -1; pointer-events: none; animation: drift 18s infinite alternate ease-in-out; }
 
         .modal-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        input, select {
-            background: rgba(255, 255, 255, 0.06) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            color: white !important;
-            border-radius: 1.25rem !important;
-            padding: 1rem !important;
-        }
-        
+        input, select { background: rgba(255, 255, 255, 0.06) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; color: white !important; border-radius: 1.25rem !important; padding: 1rem !important; outline: none; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; }
+
+        .neon-checkbox-wrapper { display: flex; align-items: center; cursor: pointer; user-select: none; }
+        .neon-checkbox { position: absolute; opacity: 0; cursor: pointer; height: 0; width: 0; }
+        .neon-checkmark { height: 24px; width: 24px; background-color: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; margin-right: 12px; position: relative; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; }
+        .neon-checkbox:checked ~ .neon-checkmark { border-color: #ff8c00; box-shadow: 0 0 15px rgba(255, 140, 0, 0.6); background-color: rgba(255, 140, 0, 0.1); }
+        .neon-checkmark:after { content: "check"; font-family: 'Material Symbols Outlined'; font-weight: 900; font-size: 18px; color: #ff8c00; display: none; filter: drop-shadow(0 0 5px #ff8c00); }
+        .neon-checkbox:checked ~ .neon-checkmark:after { display: block; }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
@@ -83,10 +80,10 @@
         const { useState, useEffect, useMemo } = React;
         const { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } = window.Recharts;
 
-        const NATURES = [
-            { id: 'Logement', icon: 'home', color: '#ff8c00' },
-            { id: 'Loyer & charges', icon: 'receipt_long', color: '#ff4b2b' },
+        const RAW_NATURES = [
+            { id: 'Logement & charges', icon: 'home', color: '#ff8c00' },
             { id: 'Courses', icon: 'shopping_cart', color: '#00f2ea' },
+            { id: 'Abonnements', icon: 'sync_saved_locally', color: '#facc15' },
             { id: 'Restaurants & bar', icon: 'local_dining', color: '#a60df2' },
             { id: 'Divertissement', icon: 'movie', color: '#4facfe' },
             { id: 'Santé', icon: 'medical_services', color: '#10b981' },
@@ -96,150 +93,126 @@
             { id: 'Autre', icon: 'more_horiz', color: '#94a3b8' }
         ];
 
+        const NATURES = [...RAW_NATURES].sort((a, b) => a.id.localeCompare(b.id));
+
+        const NeonBackground = () => (
+            <div className="fixed inset-0 overflow-hidden -z-10">
+                <div className="neon-particle" style={{ backgroundColor: '#a60df2', width: '300px', height: '300px', top: '5%', left: '5%', animationDelay: '0s' }} />
+                <div className="neon-particle" style={{ backgroundColor: '#00f2ea', width: '280px', height: '280px', top: '65%', left: '65%', animationDelay: '-4s' }} />
+                <div className="neon-particle" style={{ backgroundColor: '#ff8c00', width: '220px', height: '220px', top: '35%', left: '25%', animationDelay: '-9s' }} />
+            </div>
+        );
+
         const App = () => {
-            const [expenses, setExpenses] = useState(() => {
-                const saved = localStorage.getItem('budget_app_v9_sort');
-                return saved ? JSON.parse(saved) : [];
-            });
-            
+            const [expenses, setExpenses] = useState(() => JSON.parse(localStorage.getItem('budget_v21_current')) || []);
+            const [archives, setArchives] = useState(() => JSON.parse(localStorage.getItem('budget_v21_archives')) || []);
             const [isModalOpen, setIsModalOpen] = useState(false);
+            const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+            const [viewingArchive, setViewingArchive] = useState(null);
             const [editingId, setEditingId] = useState(null);
             const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
-
+            
             const initialFormState = { 
-                amount: '', desc: '', cat: 'propre', nature: 'Autre',
-                date: new Date().toISOString().split('T')[0] 
+                amount: '', desc: '', cat: 'propre', nature: NATURES[0].id, 
+                date: new Date().toISOString().split('T')[0], isRecurring: false 
             };
-
             const [formData, setFormData] = useState(initialFormState);
-            const currentMonth = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date());
 
             useEffect(() => {
-                localStorage.setItem('budget_app_v9_sort', JSON.stringify(expenses));
-            }, [expenses]);
+                localStorage.setItem('budget_v21_current', JSON.stringify(expenses));
+                localStorage.setItem('budget_v21_archives', JSON.stringify(archives));
+            }, [expenses, archives]);
 
-            // LOGIQUE DE TRI
-            const sortedExpenses = useMemo(() => {
-                let sortable = [...expenses];
-                sortable.sort((a, b) => {
-                    let valA, valB;
-                    if (sortConfig.key === 'date') {
-                        valA = new Date(a.date); valB = new Date(b.date);
-                    } else if (sortConfig.key === 'amount') {
-                        valA = parseFloat(a.amount); valB = parseFloat(b.amount);
-                    } else {
-                        valA = a.nature; valB = b.nature;
-                    }
+            const currentMonthName = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date());
 
-                    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                    return 0;
-                });
-                return sortable;
-            }, [expenses, sortConfig]);
-
-            const handleSort = (key) => {
-                let direction = 'desc';
-                if (sortConfig.key === key && sortConfig.direction === 'desc') {
-                    direction = 'asc';
-                }
-                setSortConfig({ key, direction });
-            };
-
-            // CALCULS DASHBOARD
             const totals = useMemo(() => {
-                let propre = 0, commun = 0, pro = 0;
+                let p = 0, c = 0, pro = 0;
                 expenses.forEach(e => {
-                    const val = parseFloat(e.amount) || 0;
-                    if (e.cat === 'propre') propre += val;
-                    else if (e.cat === 'commun') commun += val;
-                    else if (e.cat === 'pro') pro += val;
+                    const v = parseFloat(e.amount) || 0;
+                    if (e.cat === 'propre') p += v;
+                    else if (e.cat === 'commun') c += v;
+                    else if (e.cat === 'pro') pro += v;
                 });
-                return { personal: propre + (commun * 0.5), professional: pro };
+                return { personal: p + (c * 0.5), common: c, pro: pro };
             }, [expenses]);
 
-            const chartData = useMemo(() => {
-                const data = NATURES.map(n => {
-                    const partValue = expenses
-                        .filter(e => e.nature === n.id)
-                        .reduce((acc, curr) => {
-                            const val = parseFloat(curr.amount) || 0;
-                            if (curr.cat === 'propre') return acc + val;
-                            if (curr.cat === 'commun') return acc + (val * 0.5);
-                            return acc;
-                        }, 0);
-                    return { name: n.id, value: partValue, color: n.color };
-                }).filter(d => d.value > 0);
-
-                const totalPersonal = data.reduce((sum, item) => sum + item.value, 0);
-                return data.map(item => ({
-                    ...item,
-                    percentage: totalPersonal > 0 ? ((item.value / totalPersonal) * 100).toFixed(1) : 0
-                }));
-            }, [expenses]);
-
-            // ACTIONS MODAL
-            const openEdit = (exp) => {
-                setEditingId(exp.id);
-                setFormData({ ...exp });
-                setIsModalOpen(true);
-            };
+            const sortedExpenses = useMemo(() => {
+                let data = [...expenses];
+                data.sort((a, b) => {
+                    let vA = sortConfig.key === 'amount' ? parseFloat(a.amount) : a[sortConfig.key];
+                    let vB = sortConfig.key === 'amount' ? parseFloat(b.amount) : b[sortConfig.key];
+                    if (sortConfig.key === 'date') { vA = new Date(a.date); vB = new Date(b.date); }
+                    return sortConfig.direction === 'asc' ? (vA > vB ? 1 : -1) : (vA < vB ? 1 : -1);
+                });
+                return data;
+            }, [expenses, sortConfig]);
 
             const handleSave = (e) => {
                 e.preventDefault();
                 const displayDate = new Date(formData.date).toLocaleDateString('fr-FR');
-                if (editingId) {
-                    setExpenses(expenses.map(exp => exp.id === editingId ? { ...formData, displayDate } : exp));
-                } else {
-                    setExpenses([{ ...formData, id: Date.now(), displayDate }, ...expenses]);
-                }
-                setIsModalOpen(false);
-                setEditingId(null);
+                if (editingId) setExpenses(expenses.map(ex => ex.id === editingId ? { ...formData, id: editingId, displayDate } : ex));
+                else setExpenses([{ ...formData, id: Date.now(), displayDate }, ...expenses]);
+                setIsModalOpen(false); setEditingId(null);
+                setFormData(initialFormState);
             };
 
-            const closeMonth = () => {
-                if (!confirm("Exporter le PDF et réinitialiser ?")) return;
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                doc.text(`BUDGET - ${currentMonth}`, 15, 20);
-                doc.autoTable({
-                    head: [['Date', 'Description', 'Nature', 'Type', 'Montant']],
-                    body: sortedExpenses.map(e => [e.displayDate, e.desc, e.nature, e.cat, `${e.amount}€`]),
-                });
-                doc.save(`Budget_${currentMonth}.pdf`);
-                setExpenses([]);
+            const archiveMonth = () => {
+                if (expenses.length === 0) return alert("Rien à archiver !");
+                if (!confirm(`Archiver ${currentMonthName} ?`)) return;
+                const newArch = { id: Date.now(), month: currentMonthName, totals: {...totals}, data: [...expenses] };
+                setArchives([newArch, ...archives].slice(0, 12));
+                const recurring = expenses.filter(e => e.isRecurring).map(e => ({
+                    ...e, id: Date.now() + Math.random(), date: new Date().toISOString().split('T')[0], displayDate: new Date().toLocaleDateString('fr-FR')
+                }));
+                setExpenses(recurring);
             };
+
+            const chartData = useMemo(() => {
+                const rawData = NATURES.map(n => {
+                    const val = expenses.filter(e => e.nature === n.id).reduce((acc, curr) => {
+                        const amt = parseFloat(curr.amount) || 0;
+                        return acc + (curr.cat === 'propre' ? amt : (curr.cat === 'commun' ? amt * 0.5 : 0));
+                    }, 0);
+                    return { name: n.id, value: val, color: n.color };
+                }).filter(d => d.value > 0);
+                const totalValue = rawData.reduce((sum, item) => sum + item.value, 0);
+                return rawData.map(item => ({ ...item, percentage: totalValue > 0 ? ((item.value / totalValue) * 100).toFixed(1) : 0 }));
+            }, [expenses]);
 
             return (
-                <div className="max-w-md mx-auto min-h-screen relative pb-40">
-                    <header className="p-8 pb-4 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-extrabold tracking-tighter italic uppercase tracking-widest">BUDGET</h1>
-                            <p className="text-white/30 text-[10px] uppercase font-bold tracking-[0.3em]">{currentMonth}</p>
-                        </div>
-                        <button onClick={closeMonth} className="glass w-12 h-12 flex items-center justify-center">
-                            <span className="material-symbols-outlined neon-orange">ios_share</span>
-                        </button>
+                <div className="max-w-md mx-auto min-h-screen relative pb-48">
+                    <NeonBackground />
+                    
+                    <header className="p-10 pb-4 text-center">
+                        <h1 className="text-4xl font-extrabold tracking-tighter italic uppercase leading-none">BUDGET</h1>
+                        <p className="text-white/30 text-xs uppercase font-bold tracking-[0.3em] mt-2">{currentMonthName}</p>
                     </header>
 
                     {/* Dashboard */}
-                    <div className="px-6 grid grid-cols-2 gap-4 mb-6">
-                        <div className="glass p-5 card-personal">
-                            <span className="material-symbols-outlined neon-purple text-2xl mb-1">account_balance_wallet</span>
-                            <p className="text-[10px] font-bold text-personal uppercase tracking-widest">Ma Charge</p>
-                            <h2 className="text-2xl font-extrabold tracking-tight">{totals.personal.toFixed(2)}€</h2>
+                    <div className="px-6 space-y-4 mb-8">
+                        <div className="glass p-6 card-personal flex justify-between items-center">
+                            <div>
+                                <p className="text-[10px] font-bold text-personal uppercase tracking-widest mb-1">Ma Charge Réelle</p>
+                                <h2 className="text-4xl font-extrabold tracking-tight">{totals.personal.toFixed(2)}€</h2>
+                            </div>
+                            <span className="material-symbols-outlined neon-purple text-3xl">account_balance_wallet</span>
                         </div>
-                        <div className="glass p-5 card-pro text-white/50">
-                            <span className="material-symbols-outlined text-2xl mb-1 opacity-50 neon-turquoise">business_center</span>
-                            <p className="text-[10px] font-bold uppercase tracking-widest">Frais Pro</p>
-                            <h2 className="text-2xl font-extrabold tracking-tight text-white/80">{totals.professional.toFixed(2)}€</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="glass p-5 card-common">
+                                <p className="text-[10px] font-bold text-common uppercase tracking-widest mb-1">Total Commun</p>
+                                <h2 className="text-xl font-extrabold tracking-tight">{totals.common.toFixed(2)}€</h2>
+                            </div>
+                            <div className="glass p-5 card-pro text-white/50">
+                                <p className="text-[10px] font-bold text-professional uppercase tracking-widest mb-1">Frais Pro</p>
+                                <h2 className="text-xl font-extrabold tracking-tight text-white/80">{totals.pro.toFixed(2)}€</h2>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Chart Area */}
-                    <div className="px-6 mb-6">
+                    {/* Chart & Legend */}
+                    <div className="px-6 mb-8">
                         <div className="glass p-6">
-                            <p className="text-[10px] text-center font-bold text-white/20 uppercase tracking-[0.2em] mb-4">Répartition Réelle (%)</p>
+                            <p className="text-[10px] text-center font-bold text-white/20 uppercase tracking-[0.2em] mb-4">Analyse de ma part (%)</p>
                             <div className="h-48 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
@@ -250,13 +223,13 @@
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
-                            <div className="mt-4 grid grid-cols-2 gap-y-3 gap-x-4 overflow-hidden">
-                                {chartData.map((entry, index) => (
-                                    <div key={index} className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: entry.color, boxShadow: `0 0 5px ${entry.color}`}}></div>
-                                        <div className="flex flex-col">
-                                            <span className="text-[9px] text-white/40 uppercase font-bold leading-none">{entry.name}</span>
-                                            <span className="text-[11px] font-black text-white">{entry.percentage}%</span>
+                            <div className="mt-4 grid grid-cols-2 gap-y-4 gap-x-4">
+                                {chartData.map((e, i) => (
+                                    <div key={i} className="flex items-start gap-2.5">
+                                        <div className="w-1.5 h-1.5 rounded-full mt-1.5" style={{backgroundColor: e.color, boxShadow: `0 0 6px ${e.color}`}}></div>
+                                        <div className="flex flex-col leading-tight">
+                                            <span className="text-[9px] text-white/40 uppercase font-bold truncate max-w-[120px]">{e.name}</span>
+                                            <span className="text-[13px] font-black text-white">{e.percentage}%</span>
                                         </div>
                                     </div>
                                 ))}
@@ -264,55 +237,41 @@
                         </div>
                     </div>
 
-                    {/* Historical List + SORT BAR */}
+                    {/* History */}
                     <div className="px-6 space-y-3 pb-8">
                         <div className="flex justify-between items-center mb-4 px-2">
-                            <h3 className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Historique</h3>
-                            
-                            {/* Sort Bar */}
-                            <div className="flex items-center gap-3 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                                <button onClick={() => handleSort('date')} className={`transition-all ${sortConfig.key === 'date' ? 'neon-orange' : 'text-white/20'}`}>
-                                    <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-                                </button>
-                                <button onClick={() => handleSort('nature')} className={`transition-all ${sortConfig.key === 'nature' ? 'neon-orange' : 'text-white/20'}`}>
-                                    <span className="material-symbols-outlined text-[18px]">label</span>
-                                </button>
-                                <button onClick={() => handleSort('amount')} className={`transition-all ${sortConfig.key === 'amount' ? 'neon-orange' : 'text-white/20'}`}>
-                                    <span className="material-symbols-outlined text-[18px]">euro</span>
-                                </button>
-                                <span className="material-symbols-outlined text-[14px] text-white/40 ml-1">
-                                    {sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}
-                                </span>
+                            <h3 className="text-[10px] font-bold text-white/20 uppercase tracking-widest leading-none">Historique</h3>
+                            <div className="flex items-center gap-3 bg-white/5 px-3 py-1.5 rounded-full border border-white/10 shadow-lg">
+                                <button onClick={() => setSortConfig({key:'date', direction: sortConfig.direction==='desc'?'asc':'desc'})} className={`transition-all ${sortConfig.key==='date' ? 'neon-orange' : 'text-white/20'}`}><span className="material-symbols-outlined text-[18px]">calendar_month</span></button>
+                                <button onClick={() => setSortConfig({key:'nature', direction: sortConfig.direction==='desc'?'asc':'desc'})} className={`transition-all ${sortConfig.key==='nature' ? 'neon-orange' : 'text-white/20'}`}><span className="material-symbols-outlined text-[18px]">label</span></button>
+                                <button onClick={() => setSortConfig({key:'amount', direction: sortConfig.direction==='desc'?'asc':'desc'})} className={`transition-all ${sortConfig.key==='amount' ? 'neon-orange' : 'text-white/20'}`}><span className="material-symbols-outlined text-[18px]">euro</span></button>
                             </div>
                         </div>
 
-                        {sortedExpenses.length === 0 && <p className="text-center text-white/10 text-xs py-10 italic">Aucune donnée</p>}
-                        
                         {sortedExpenses.map(exp => {
-                            const natureConfig = NATURES.find(n => n.id === exp.nature) || NATURES[NATURES.length-1];
+                            const nature = NATURES.find(n => n.id === exp.nature) || NATURES[0];
                             return (
-                                <div key={exp.id} className="glass p-4 flex items-center justify-between border-white/5 group">
+                                <div key={exp.id} className="glass p-4 flex items-center justify-between group border-white/5">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${natureConfig.color}15`, border: `1px solid ${natureConfig.color}30` }}>
-                                            <span className="material-symbols-outlined text-xl" style={{ color: natureConfig.color, filter: `drop-shadow(0 0 3px ${natureConfig.color})` }}>
-                                                {natureConfig.icon}
-                                            </span>
+                                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5" style={{ border: `1px solid ${nature.color}30` }}>
+                                            <span className="material-symbols-outlined text-xl" style={{color: nature.color, filter: `drop-shadow(0 0 3px ${nature.color})`}}>{nature.icon}</span>
                                         </div>
                                         <div>
-                                            <p className="text-sm font-bold tracking-tight">{exp.desc}</p>
-                                            <p className="text-[9px] text-white/30 uppercase font-bold">
-                                                <span style={{color: natureConfig.color}}>{exp.nature}</span> • {exp.cat}
-                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-bold tracking-tight text-white/90">{exp.desc}</p>
+                                                {exp.isRecurring && <span className="material-symbols-outlined text-[14px] text-accent neon-orange">sync</span>}
+                                            </div>
+                                            <p className="text-[9px] text-white/30 uppercase font-bold mt-1">{exp.nature} • {exp.cat}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="text-right mr-1">
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-right">
                                             <p className="font-extrabold text-sm">{exp.amount}€</p>
                                             <p className="text-[8px] text-white/20">{exp.displayDate}</p>
                                         </div>
                                         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={() => openEdit(exp)} className="text-white/20 hover:text-accent"><span className="material-symbols-outlined text-[18px]">edit_note</span></button>
-                                            <button onClick={() => { if(confirm("Supprimer ?")) setExpenses(expenses.filter(e => e.id !== exp.id)) }} className="text-white/20 hover:text-red-500"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+                                            <button onClick={() => {setEditingId(exp.id); setFormData({...exp}); setIsModalOpen(true);}} className="text-white/20 hover:text-accent transition-colors"><span className="material-symbols-outlined text-lg">edit_note</span></button>
+                                            <button onClick={() => setExpenses(expenses.filter(e=>e.id!==exp.id))} className="text-white/20 hover:text-red-500 transition-colors"><span className="material-symbols-outlined text-lg">delete</span></button>
                                         </div>
                                     </div>
                                 </div>
@@ -320,31 +279,44 @@
                         })}
                     </div>
 
-                    {/* Floating Add Button */}
-                    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-40">
-                        <button onClick={() => { setEditingId(null); setFormData(initialFormState); setIsModalOpen(true); }} className="btn-plus w-20 h-20 rounded-full flex items-center justify-center text-dark active:scale-90">
-                            <span className="material-symbols-outlined font-black text-5xl">add</span>
-                        </button>
+                    {/* Bottom Nav */}
+                    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-40">
+                        <div className="glass h-20 px-8 flex justify-between items-center shadow-2xl relative">
+                            <button onClick={() => setIsArchiveOpen(true)} className="flex flex-col items-center gap-1 transition-transform active:scale-90">
+                                <span className="material-symbols-outlined text-personal neon-purple text-3xl">inventory_2</span>
+                                <span className="text-[8px] font-black uppercase text-white/40 tracking-widest">Archives</span>
+                            </button>
+
+                            <button onClick={() => {setEditingId(null); setIsModalOpen(true);}} className="btn-plus w-20 h-20 rounded-full flex items-center justify-center text-dark absolute -top-8 left-1/2 -translate-x-1/2">
+                                <span className="material-symbols-outlined font-black text-5xl">add</span>
+                            </button>
+
+                            <button onClick={archiveMonth} className="flex flex-col items-center gap-1 transition-transform active:scale-90">
+                                <span className="material-symbols-outlined text-professional neon-turquoise text-3xl">archive</span>
+                                <span className="text-[8px] font-black uppercase text-white/40 tracking-widest">Archiver</span>
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Modal */}
+                    {/* Modal Saisie */}
                     {isModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/85 backdrop-blur-sm p-4">
                             <div className="glass w-full max-w-sm p-8 modal-up mb-4 border-accent/20">
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-xl font-extrabold tracking-tighter italic uppercase">{editingId ? 'Modifier' : 'Ajouter'}</h2>
-                                    <button onClick={() => setIsModalOpen(false)} className="text-white/30"><span className="material-symbols-outlined">close</span></button>
+                                    <button onClick={() => setIsModalOpen(false)} className="text-white/30 transition-transform active:scale-90"><span className="material-symbols-outlined">close</span></button>
                                 </div>
                                 <form onSubmit={handleSave} className="space-y-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-bold text-white/30 uppercase tracking-widest ml-2">Date</label>
-                                        <input type="date" className="w-full" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-bold text-white/30 uppercase tracking-widest ml-2">Montant & Détails</label>
-                                        <input type="number" step="0.01" placeholder="0.00€" className="w-full text-2xl font-black" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required />
-                                        <input type="text" placeholder="Description" className="w-full text-sm font-bold mt-2" value={formData.desc} onChange={e => setFormData({...formData, desc: e.target.value})} required />
-                                    </div>
+                                    <input type="date" className="w-full font-bold" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required />
+                                    <input type="number" step="0.01" placeholder="Montant 0.00€" className="w-full text-2xl font-black" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required />
+                                    <input type="text" placeholder="Description" className="w-full text-sm font-bold" value={formData.desc} onChange={e => setFormData({...formData, desc: e.target.value})} required />
+                                    
+                                    <label className="neon-checkbox-wrapper group">
+                                        <input type="checkbox" className="neon-checkbox" checked={formData.isRecurring} onChange={e => setFormData({...formData, isRecurring: e.target.checked})} />
+                                        <span className="neon-checkmark"></span>
+                                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Dépense récurrente</span>
+                                    </label>
+
                                     <div className="grid grid-cols-3 gap-2">
                                         {['propre', 'commun', 'pro'].map(c => (
                                             <button key={c} type="button" onClick={() => setFormData({...formData, cat: c})} className={`py-3 rounded-2xl text-[9px] font-black uppercase transition-all border ${formData.cat === c ? 'bg-white text-dark border-white scale-95' : 'bg-transparent text-white/40 border-white/10'}`}>
@@ -352,14 +324,78 @@
                                             </button>
                                         ))}
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-bold text-white/30 uppercase tracking-widest ml-2">Nature</label>
-                                        <select className="w-full text-sm font-bold appearance-none" value={formData.nature} onChange={e => setFormData({...formData, nature: e.target.value})}>
-                                            {NATURES.map(n => <option key={n.id} value={n.id} className="bg-dark text-white">{n.id}</option>)}
-                                        </select>
-                                    </div>
-                                    <button className="btn-plus w-full py-5 rounded-3xl text-dark font-black tracking-widest text-xs mt-4 uppercase">{editingId ? 'Mettre à jour' : 'Enregistrer'}</button>
+                                    <select className="w-full text-sm font-bold appearance-none" value={formData.nature} onChange={e => setFormData({...formData, nature: e.target.value})}>
+                                        {NATURES.map(n => <option key={n.id} value={n.id} className="bg-dark text-white">{n.id}</option>)}
+                                    </select>
+                                    <button className="btn-plus w-full py-5 rounded-3xl text-dark font-black tracking-widest text-xs mt-4 uppercase">Valider</button>
                                 </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Archives Panel - UPDATED WITH TOTALS VISU */}
+                    {isArchiveOpen && (
+                        <div className="fixed inset-0 z-50 flex flex-col bg-dark/98 backdrop-blur-xl animate-slide-up">
+                            <header className="p-8 flex justify-between items-center border-b border-white/10">
+                                <h2 className="text-2xl font-black italic uppercase tracking-tighter">Archives</h2>
+                                <button onClick={() => setIsArchiveOpen(false)} className="glass w-12 h-12 flex items-center justify-center transition-transform active:scale-90"><span className="material-symbols-outlined">close</span></button>
+                            </header>
+                            <div className="p-6 space-y-5 overflow-y-auto">
+                                {archives.map(arch => (
+                                    <div key={arch.id} className="glass p-6 border-white/5 space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <p className="text-sm font-black text-white/70 uppercase tracking-widest leading-none">{arch.month}</p>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setViewingArchive(arch)} className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-professional neon-turquoise"><span className="material-symbols-outlined text-sm">visibility</span></button>
+                                                <button onClick={() => { const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.text(arch.month, 15, 20); doc.autoTable({ head: [['Desc', 'Montant']], body: arch.data.map(e=>[e.desc, e.amount]) }); doc.save(`${arch.month}.pdf`); }} className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-accent neon-orange"><span className="material-symbols-outlined text-sm">download</span></button>
+                                                <button onClick={() => { if(confirm("Supprimer ?")) setArchives(archives.filter(a=>a.id!==arch.id)) }} className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-red-500 transition-all active:scale-90"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* SUMMARY TRIO FOR ARCHIVE */}
+                                        <div className="grid grid-cols-3 gap-2 pt-2">
+                                            <div className="flex flex-col items-center">
+                                                <p className="text-[7px] font-black text-personal uppercase tracking-widest mb-1">Ma Charge</p>
+                                                <p className="text-sm font-extrabold text-white">{arch.totals.personal.toFixed(0)}€</p>
+                                            </div>
+                                            <div className="flex flex-col items-center border-x border-white/5">
+                                                <p className="text-[7px] font-black text-common uppercase tracking-widest mb-1">Commun</p>
+                                                <p className="text-sm font-extrabold text-white">{arch.totals.common.toFixed(0)}€</p>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <p className="text-[7px] font-black text-professional uppercase tracking-widest mb-1">Frais Pro</p>
+                                                <p className="text-sm font-extrabold text-white">{arch.totals.pro.toFixed(0)}€</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {archives.length === 0 && <p className="text-center text-white/20 mt-20 italic">Aucune archive</p>}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Archive Detail View */}
+                    {viewingArchive && (
+                        <div className="fixed inset-0 z-[60] flex flex-col bg-dark animate-slide-up">
+                            <header className="p-8 flex justify-between items-center bg-white/5 border-b border-white/10">
+                                <h2 className="text-xl font-black italic uppercase leading-none">{viewingArchive.month}</h2>
+                                <button onClick={() => setViewingArchive(null)} className="glass w-12 h-12 flex items-center justify-center transition-transform active:scale-90"><span className="material-symbols-outlined">arrow_back</span></button>
+                            </header>
+                            <div className="p-6 space-y-3 overflow-y-auto">
+                                {viewingArchive.data.map(exp => (
+                                    <div key={exp.id} className="glass p-4 flex justify-between items-center">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
+                                                <span className="material-symbols-outlined text-sm text-white/40">{RAW_NATURES.find(n=>n.id===exp.nature)?.icon}</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold tracking-tight leading-none text-white/90">{exp.desc}</p>
+                                                <p className="text-[9px] text-white/30 uppercase font-bold mt-1">{exp.nature} • {exp.cat}</p>
+                                            </div>
+                                        </div>
+                                        <p className="font-extrabold text-sm text-white">{exp.amount}€</p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}

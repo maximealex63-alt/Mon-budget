@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Budget Perso & Pro</title>
+    
+    <!-- Dépendances React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Recharts (Nécessite prop-types pour le CDN) -->
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+    
+    <!-- Icônes Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; }
+        .card { @apply bg-white rounded-2xl shadow-sm border border-slate-200 p-6; }
+        .input-style { @apply w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white; }
+        select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; background-size: 1em; }
+        ::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(0.5); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        const { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } = window.Recharts;
+
+        const NATURES = [
+            { id: 'Logement', color: '#6366f1' },
+            { id: 'Loyer & charges', color: '#4f46e5' },
+            { id: 'Courses', color: '#10b981' },
+            { id: 'Santé', color: '#f43f5e' },
+            { id: 'Assurance', color: '#64748b' },
+            { id: 'Restaurants & bars', color: '#f59e0b' },
+            { id: 'Shopping', color: '#ec4899' },
+            { id: 'Transport', color: '#06b6d4' },
+            { id: 'Autre', color: '#94a3b8' }
+        ];
+
+        const App = () => {
+            // Initialisation de la date du jour au format YYYY-MM-DD pour l'input date
+            const getToday = () => new Date().toISOString().split('T')[0];
+
+            const [expenses, setExpenses] = useState(() => {
+                const saved = localStorage.getItem('budget_v2_data');
+                return saved ? JSON.parse(saved) : [];
+            });
+
+            const [formData, setFormData] = useState({
+                date: getToday(),
+                amount: '',
+                description: '',
+                category: 'propre',
+                nature: 'Autre'
+            });
+
+            const currentMonthHeader = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date());
+
+            useEffect(() => {
+                localStorage.setItem('budget_v2_data', JSON.stringify(expenses));
+                if (window.lucide) window.lucide.createIcons();
+            }, [expenses]);
+
+            // Calculs financiers
+            const stats = useMemo(() => {
+                let propre = 0, commun = 0, pro = 0;
+                expenses.forEach(e => {
+                    const val = parseFloat(e.amount) || 0;
+                    if (e.category === 'propre') propre += val;
+                    else if (e.category === 'commun') commun += val;
+                    else if (e.category === 'pro') pro += val;
+                });
+                const partCommune = commun * 0.5;
+                return { personal: propre + partCommune, partCommune: partCommune, professional: pro };
+            }, [expenses]);
+
+            // Tri des dépenses par date (décroissant)
+            const sortedExpenses = useMemo(() => {
+                return [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+            }, [expenses]);
+
+            const chartData = useMemo(() => {
+                return NATURES.map(n => ({
+                    name: n.id,
+                    value: expenses.filter(e => e.nature === n.id).reduce((acc, curr) => acc + parseFloat(curr.amount), 0),
+                    color: n.color
+                })).filter(d => d.value > 0);
+            }, [expenses]);
+
+            const addExpense = (e) => {
+                e.preventDefault();
+                if (!formData.amount || !formData.description || !formData.date) return;
+                
+                const newExp = { ...formData, id: Date.now() };
+                setExpenses([newExp, ...expenses]);
+                
+                // Reset du formulaire en gardant la dernière date sélectionnée par confort
+                setFormData({ ...formData, amount: '', description: '' });
+            };
+
+            const deleteExp = (id) => setExpenses(expenses.filter(e => e.id !== id));
+
+            const formatDateFR = (dateStr) => {
+                const [year, month, day] = dateStr.split('-');
+                return `${day}/${month}/${year}`;
+            };
+
+            const closeMonth = () => {
+                if (!confirm("Exporter le PDF et réinitialiser pour le mois suivant ?")) return;
+                
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.setFontSize(20);
+                doc.text(`Rapport Budget - ${currentMonthHeader}`, 20, 20);
+                
+                doc.setFontSize(12);
+                doc.text(`Total Personnel : ${stats.personal.toFixed(2)}€`, 20, 40);
+                doc.text(`Dont part commune (50%) : ${stats.partCommune.toFixed(2)}€`, 20, 48);
+                doc.text(`Total Professionnel : ${stats.professional.toFixed(2)}€`, 20, 56);
+
+                const tableRows = sortedExpenses.map(e => [
+                    formatDateFR(e.date), 
+                    e.description, 
+                    e.nature, 
+                    e.category === 'pro' ? 'Professionnel' : (e.category === 'commun' ? 'Commun (50%)' : 'Propre'), 
+                    `${e.amount}€`
+                ]);
+
+                doc.autoTable({
+                    startY: 65,
+                    head: [['Date', 'Description', 'Nature', 'Catégorie', 'Montant']],
+                    body: tableRows,
+                    theme: 'grid',
+                    headStyles: { fillColor: [30, 41, 59] }
+                });
+
+                doc.save(`Budget_${currentMonthHeader.replace(' ', '_')}.pdf`);
+                setExpenses([]);
+                localStorage.removeItem('budget_v2_data');
+            };
+
+            return (
+                <div className="max-w-6xl mx-auto p-4 md:p-8">
+                    {/* Header */}
+                    <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                        <div>
+                            <h1 className="text-3xl font-black text-slate-900 capitalize tracking-tight">{currentMonthHeader}</h1>
+                            <p className="text-slate-500 font-medium">Gestion simplifiée de vos dépenses</p>
+                        </div>
+                        <button onClick={closeMonth} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-bold">
+                            <i data-lucide="file-check" className="w-5 h-5"></i> Clôturer le mois
+                        </button>
+                    </header>
+
+                    {/* Widgets Totaux */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div className="card border-l-8 border-l-blue-600 bg-gradient-to-br from-white to-blue-50">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-slate-500 uppercase text-xs font-black tracking-widest">Total Personnel</span>
+                                <div className="p-2 bg-blue-600 rounded-lg text-white"><i data-lucide="user" className="w-5 h-5"></i></div>
+                            </div>
+                            <div className="text-4xl font-black text-slate-900">{stats.personal.toFixed(2)} €</div>
+                            <div className="mt-4 text-xs font-bold text-blue-700 bg-blue-100 py-1.5 px-3 rounded-full inline-block">
+                                Inclus 50% du commun : {stats.partCommune.toFixed(2)} €
+                            </div>
+                        </div>
+
+                        <div className="card border-l-8 border-l-emerald-600 bg-gradient-to-br from-white to-emerald-50">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-slate-500 uppercase text-xs font-black tracking-widest">Total Professionnel</span>
+                                <div className="p-2 bg-emerald-600 rounded-lg text-white"><i data-lucide="briefcase" className="w-5 h-5"></i></div>
+                            </div>
+                            <div className="text-4xl font-black text-slate-900">{stats.professional.toFixed(2)} €</div>
+                            <div className="mt-4 text-xs font-bold text-emerald-700 bg-emerald-100 py-1.5 px-3 rounded-full inline-block">
+                                Remboursable à 100%
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Formulaire de saisie */}
+                        <div className="lg:col-span-1">
+                            <div className="card sticky top-8 shadow-xl border-blue-100">
+                                <h2 className="text-xl font-black mb-6 flex items-center gap-2">
+                                    <i data-lucide="plus-circle" className="text-blue-600"></i> Nouvelle saisie
+                                </h2>
+                                <form onSubmit={addExpense} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-black uppercase text-slate-500 mb-1">Date</label>
+                                        <input type="date" className="input-style font-medium" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black uppercase text-slate-500 mb-1">Montant (€)</label>
+                                        <input type="number" step="0.01" className="input-style" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0.00" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black uppercase text-slate-500 mb-1">Description</label>
+                                        <input type="text" className="input-style" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Ex: Abonnement Internet" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black uppercase text-slate-500 mb-2">Catégorie</label>
+                                        <div className="space-y-2">
+                                            {[
+                                                {id: 'propre', label: 'Dépense Propre (100%)', color: 'indigo'},
+                                                {id: 'commun', label: 'Dépense Commune (50%)', color: 'purple'},
+                                                {id: 'pro', label: 'Dépense Professionnelle', color: 'emerald'}
+                                            ].map(cat => (
+                                                <label key={cat.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${formData.category === cat.id ? `bg-${cat.color}-50 border-${cat.color}-600 text-${cat.color}-700 shadow-sm` : 'border-slate-200 text-slate-600'}`}>
+                                                    <input type="radio" name="cat" className="hidden" checked={formData.category === cat.id} onChange={() => setFormData({...formData, category: cat.id})} />
+                                                    <span className="text-xs font-bold">{cat.label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black uppercase text-slate-500 mb-1">Nature</label>
+                                        <select className="input-style font-medium" value={formData.nature} onChange={e => setFormData({...formData, nature: e.target.value})}>
+                                            {NATURES.map(n => <option key={n.id} value={n.id}>{n.id}</option>)}
+                                        </select>
+                                    </div>
+                                    <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all mt-4">
+                                        AJOUTER
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        {/* Graphique et Liste */}
+                        <div className="lg:col-span-2 space-y-6">
+                            <div className="card h-[400px]">
+                                <h2 className="text-xl font-black mb-4">Répartition des dépenses</h2>
+                                {chartData.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={chartData} innerRadius={80} outerRadius={110} paddingAngle={5} dataKey="value">
+                                                {chartData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                                            </Pie>
+                                            <Tooltip />
+                                            <Legend verticalAlign="bottom" height={36}/>
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-400 italic">
+                                        <i data-lucide="bar-chart-3" className="w-12 h-12 mb-2 opacity-20"></i>
+                                        <p>En attente de données...</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="card overflow-hidden p-0">
+                                <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                                    <h2 className="text-xl font-black text-slate-800">Historique détaillé</h2>
+                                    <span className="text-xs font-black bg-slate-200 px-2 py-1 rounded text-slate-600">{sortedExpenses.length} opérations</span>
+                                </div>
+                                <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-white sticky top-0 shadow-sm">
+                                            <tr>
+                                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date & Dépense</th>
+                                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Catégorie</th>
+                                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Montant</th>
+                                                <th className="p-4"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {sortedExpenses.map(exp => (
+                                                <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="p-4">
+                                                        <div className="font-bold text-slate-900 leading-tight">{exp.description}</div>
+                                                        <div className="text-[11px] text-slate-500 font-medium">{formatDateFR(exp.date)} • {exp.nature}</div>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md ${
+                                                            exp.category === 'pro' ? 'bg-emerald-100 text-emerald-700' : 
+                                                            (exp.category === 'commun' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700')
+                                                        }`}>
+                                                            {exp.category}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-right font-black text-slate-900">{parseFloat(exp.amount).toFixed(2)} €</td>
+                                                    <td className="p-4 text-right">
+                                                        <button onClick={() => deleteExp(exp.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                                                            <i data-lucide="trash-2" className="w-5 h-5"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
